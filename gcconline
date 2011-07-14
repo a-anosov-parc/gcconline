@@ -1,0 +1,88 @@
+#!/usr/bin/php
+<?php
+	// Этот скрипт зависит от пакетов: php5 php5-cli php5-curl
+	if ($argc > 1) {
+		// Определяем рабочую директорию
+		$cd = getcwd();
+		// Определяем вид слешей
+		define('DS', DIRECTORY_SEPARATOR);
+		// Определяем индекс последнего параметра (название входного файла)
+		$last_index = $argc - 1;
+		// Устанавливаем степень сжатия скрипта по умолчанию
+		$compilation_level = 'ADVANCED_OPTIMIZATIONS';
+		// Читаем параметры
+		for ($i = 1; $i < $last_index; $i++) {
+			// Настраиваем скрипт согласно параметрам
+			switch ($argv[$i]) {
+				case '-w':	// WHITESPACE_ONLY
+					$compilation_level = 'WHITESPACE_ONLY';
+					break;
+				case '-s':	// SIMPLE_OPTIMIZATIONS
+					$compilation_level = 'SIMPLE_OPTIMIZATIONS';
+					break;
+				case '-o':	// Выходной файл
+					$output_filename = $cd.DS.$argv[++$i];
+					break;
+			}
+		}
+		// Получаем название файла, который необходимо сжать
+		$input_file = $cd.DS.$argv[$last_index];
+		// Читаем содержимое входного файла
+		$input_content = '';
+		if (file_exists($input_file))
+			$input_content = file_get_contents($input_file);
+		else {
+			echo 'File `'.$input_file.'` not found'.chr(10);
+			// Если не найден входной файл - возвращаем 2
+			exit(2);
+		}
+		// Инициализируем POST-запрос
+		$request = curl_init();
+		// Задаем параметры POST-запроса
+		$post_data = 'compilation_level='.$compilation_level
+			.'&output_format=text'
+			.'&output_info=compiled_code'
+			.'&js_code='.urlencode($input_content);
+		// Открываем файл, куда запишем ответ от сервера
+		$output_file = fopen(!isset($output_filename) ?
+							 $cd.DS.'gcconline.min.js' :
+							 $output_filename, 'w');
+		// Задаем параметры запроса через cURL
+		curl_setopt_array($request, array(
+			CURLOPT_URL			=> 'http://closure-compiler.appspot.com/compile',
+			CURLOPT_FILE		=> $output_file,
+			CURLOPT_POST		=> 1,
+			CURLOPT_POSTFIELDS	=> $post_data,
+		));
+		// Выполняем запрос к онлайн-сервису Google Closure Compiler
+		$curl_status = curl_exec($request);
+		// Обрабытываем ошибки подключения к Google Closure Compiler
+		if (!$curl_status) {
+			echo 'Unable to connect to Google Closure Compiler service. Check your internet connection'.chr(10);
+			// Если невозможно через интернет подключиться к сервису - возвращаем 3
+			exit(3);
+		}
+		// Если не указан выходной файл
+		if (!isset($output_filename)) {
+			// Выводим содержимое сжатого файла в консоль
+			echo file_get_contents($cd.DS.'gcconline.min.js');
+			// Удаляем временный файл
+			unlink($cd.DS.'gcconline.min.js');
+		}
+	}
+	else {
+		// Инструкция по использованию скрипта
+		echo 'Usage: gcconline [options] [input file]'.chr(10).chr(10)
+			.'Options'.chr(10)
+			.'  -a                  Advansed optimizations (default)'.chr(10)
+			.'  -s                  Simple optimizations'.chr(10)
+			.'  -w                  Whitespace only'.chr(10)
+			.'  -o <file>           Place the output into <file>. Defaults to stdout'.chr(10)
+			
+			;
+		// Если скрипт запущен без параметров - возвращаем 1
+		exit(1);
+	}
+	
+	// Если скрипт отработал без ошибок - возвращаем 0
+	exit(0);
